@@ -15,8 +15,11 @@
  * 8. Adding prefetching ~ 10.8-10.9 seconds
  */
 
-#include "../include/arena.h"
 #include <SDL2/SDL.h>
+
+#include "../include/sparse_set.h"
+#include "../include/arena.h"
+
 #include <arm_neon.h>
 #include <iostream>
 #include <pthread.h>
@@ -67,172 +70,6 @@ typedef struct {
     void* arg;
 } task_t;
 
-typedef struct sparse_set {
-    uint32_t* dense;
-    uint32_t* sparse;
-    // instead of SDL_Elipse* data;
-    float *x, *y;
-    uint32_t *w, *h;
-    SDL_Point* points;
-
-    size_t capacity, count;
-} elipse_sset;
-
-typedef struct {
-    uint32_t* dense;
-    uint32_t* sparse;
-    // instead of Speed* data;
-    float* x_speed;
-    float* y_speed;
-
-    size_t capacity, count;
-} speed_sset;
-
-typedef struct {
-    // pool allocator
-    uint32_t* free_list;
-    size_t free_count;
-    size_t next_id;
-    uint32_t* generations;
-
-    uint32_t capacity;
-} entity_manager;
-
-typedef struct {
-    uint32_t id;
-    uint16_t generation;
-} entity_id;
-
-SDL_Rect create_rect(float_t x, float_t y, float_t w, float_t h)
-{
-    SDL_Rect rect;
-    rect.x = x;
-    rect.y = y;
-    rect.w = w;
-    rect.h = h;
-    return rect;
-}
-
-// System
-
-entity_manager* entity_manager_init(entity_manager* em, Arena* arena, size_t capacity)
-{
-    em->capacity = capacity;
-    em->generations = PushArray(arena, uint32_t, capacity);
-    em->free_list = PushArray(arena, uint32_t, capacity);
-    em->free_count = 0;
-    em->next_id = 0;
-    return em;
-}
-
-entity_id create_id(entity_manager* em)
-{
-    uint32_t id;
-    if (em->free_count == 0) {
-        id = em->next_id++;
-        em->generations[id] = 0;
-    } else {
-        id = em->free_list[--em->free_count];
-        em->generations[id]++;
-    }
-
-    uint16_t gen = em->generations[id];
-    // return (gen << 16) | id;
-    entity_id ei = { id, gen };
-    return ei;
-}
-
-// elipse_sset functions
-elipse_sset* elipse_sset_init(elipse_sset* set, Arena* arena, size_t capacity)
-{
-    set->dense = PushArray(arena, uint32_t, capacity);
-    set->sparse = PushArray(arena, uint32_t, capacity);
-    // set->data = PushArray(arena, SDL_Elipse, capacity);
-    set->x = PushArray(arena, float, capacity);
-    set->y = PushArray(arena, float, capacity);
-    set->w = PushArray(arena, uint32_t, capacity);
-    set->h = set->w;
-
-    set->points = PushArray(arena, SDL_Point, capacity * points_size);
-
-    set->capacity = capacity;
-    set->count = 0;
-    return set;
-}
-
-void add(sparse_set* set, float x, float y, uint32_t w, uint32_t h, SDL_Point* points, entity_id id, entity_manager* em)
-{
-    if (set->count > set->capacity || id.generation != em->generations[id.id]) {
-        // printf("Error could not be added! capacity(%zu) id smaller than count(%zu)\n", set->capacity, set->count);
-        return;
-    }
-
-    set->dense[set->count] = id.id;
-    set->sparse[id.id] = set->count;
-    // set->data[set->count] = elipse;
-    set->x[set->count] = x;
-    set->y[set->count] = y;
-    set->h[set->count] = h;
-    set->count++;
-    // printf("  SUCCESS: added at count=%zu\n", set->count - 1);
-}
-
-void remove(elipse_sset* set, entity_id id, entity_manager* em)
-{
-    size_t old_id = set->sparse[id.id];
-    size_t last = --set->count;
-
-    set->dense[old_id] = last;
-    // set->data[old_id] = set->data[last];
-    set->x[old_id] = set->x[last];
-    set->y[old_id] = set->y[last];
-    set->h[old_id] = set->h[last];
-
-    set->sparse[set->dense[old_id]] = old_id;
-
-    em->free_list[em->free_count] = old_id;
-    em->free_count++;
-}
-
-void clear(elipse_sset* set)
-{
-    set->count = 0;
-}
-
-size_t search(elipse_sset* set, uint32_t id)
-{
-    size_t index = set->sparse[id];
-    return index;
-}
-
-// speed_sset functions
-speed_sset* speed_sset_init(speed_sset* set, Arena* arena, size_t capacity)
-{
-    set->dense = PushArray(arena, uint32_t, capacity);
-    set->sparse = PushArray(arena, uint32_t, capacity);
-    // set->data = PushArray(arena, Speed, capacity);
-    set->x_speed = PushArray(arena, float, capacity);
-    set->y_speed = PushArray(arena, float, capacity);
-
-    set->capacity = capacity;
-    set->count = 0;
-    return set;
-}
-
-void add(speed_sset* set, float x_speed, float y_speed, entity_id id, entity_manager* em)
-{
-    if (set->count >= set->capacity || id.generation != em->generations[id.id]) {
-        // printf("Error could not be added! capacity(%zu) id smaller than count(%zu)\n", set->capacity, set->count);
-        return;
-    }
-
-    set->dense[set->count] = id.id;
-    set->sparse[id.id] = set->count;
-    // set->data[set->count] = sp;
-    set->x_speed[set->count] = x_speed;
-    set->y_speed[set->count] = y_speed;
-    set->count++;
-}
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // main function
@@ -439,8 +276,8 @@ void* create_circles(void* argv)
         float x = (arc4random() % WINDOW_WIDTH);
         float y = (arc4random() % WINDOW_HEIGHT);
 
-        add(eset, x, y, CIRCLE_WIDTH, CIRCLE_WIDTH, NULL, entity_id, em);
-        add(sset, (float)(i + 1), (float)9.81 / 60 * 5 * (i + 1), entity_id, em);
+        add_elipse(eset, x, y, CIRCLE_WIDTH, CIRCLE_WIDTH, NULL, entity_id, em);
+        add_speed(sset, (float)(i + 1), (float)9.81 / 60 * 5 * (i + 1), entity_id, em);
         compute_circle(x, y, CIRCLE_WIDTH, eset->points, i, points_size);
 
         i++;
@@ -472,7 +309,7 @@ void* thread_work(void* argc)
     }
 }
 
-int main(void)
+int run_ecs_optimized(void)
 {
     SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");

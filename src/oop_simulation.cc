@@ -3,9 +3,9 @@
  * Problem: the program draws 100, 1k, 10k, 100k, 1m of objects and simulates how the ball (circle) falls and then bounces back.
  */
 
+#include <iostream>
 #include <SDL2/SDL.h>
 #include <SDL.h>
-#include <iostream>
 
 using namespace std;
 
@@ -179,7 +179,7 @@ bool draw_objects(SDL_Window* sdl_window, SDL_Renderer* renderer, size_t capacit
 //
 //
 
-int main(int argc, char* argv[])
+int run_oop_simulation(void)
 {
     SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
