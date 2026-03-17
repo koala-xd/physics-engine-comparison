@@ -5,6 +5,8 @@
 
 const uint32_t points_size = (10 * 8 * 35 / 49 + (8 - 1)) & -8;
 
+// Basic Entities
+
 SDL_Elipse create_elipse(float_t x, float_t y, uint32_t w, uint32_t h)
 {
     SDL_Elipse elipse;
@@ -25,8 +27,6 @@ SDL_Rect create_rect(float_t x, float_t y, float_t w, float_t h)
     return rect;
 }
 
-
-// System
 
 entity_manager* entity_manager_init(entity_manager* em, Arena* arena, size_t capacity)
 {
@@ -55,7 +55,22 @@ entity_id create_id(entity_manager* em)
     return ei;
 }
 
-// elipse_sset functions
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+/*
+ * ECS implementation
+ *
+ *
+ * Sparse set features:
+ * add
+ * delete (Keeping track of free ids, generations, alive)
+ * search
+ * clear
+ *
+ */
+
+
+// elipse_sset functions SoA approach
 elipse_sset* elipse_sset_init(elipse_sset* set, Arena* arena, size_t capacity)
 {
     set->dense = PushArray(arena, uint32_t, capacity);
@@ -73,48 +88,26 @@ elipse_sset* elipse_sset_init(elipse_sset* set, Arena* arena, size_t capacity)
     return set;
 }
 
-
-elipse_sset_d* elipse_sset_d_init(elipse_sset_d* set, Arena* arena, size_t capacity) {
-	set->dense = PushArray(arena, uint32_t, capacity); 
-	set->sparse = PushArray(arena, uint32_t, capacity); 
-	set->data = PushArray(arena, SDL_Elipse, capacity); 
-    set->capacity = capacity;
-    set->count = 0;
-    return set;
-}
-
 void add_elipse(elipse_sset* set, float x, float y, uint32_t w, uint32_t h, SDL_Point* points, entity_id id, entity_manager* em)
 {
     if (set->count > set->capacity || id.generation != em->generations[id.id]) {
-        // printf("Error could not be added! capacity(%zu) id smaller than count(%zu)\n", set->capacity, set->count);
+        printf("Error could not be added! capacity(%zu) id smaller than count(%zu)\n", set->capacity, set->count);
         return;
     }
 
     set->dense[set->count] = id.id;
     set->sparse[id.id] = set->count;
-    // set->data[set->count] = elipse;
+
     set->x[set->count] = x;
     set->y[set->count] = y;
     set->h[set->count] = h;
+
+    // set->data[set->count] = elipse;
+	if(points != NULL) {
+		memcpy(&set->points[set->count * points_size], points, sizeof(SDL_Point) * points_size);
+	}
+
     set->count++;
-    // printf("  SUCCESS: added at count=%zu\n", set->count - 1);
-}
-
-void add_elipse_d(elipse_sset_d* set, SDL_Elipse elipse, entity_id id, entity_manager* em)
-{
-
-    //printf("add() called: id=%u, gen=%u, count=%zu, capacity=%zu\n", id.id, id.generation, set->count, set->capacity);
-
-    if (set->count > set->capacity || id.generation != em->generations[id.id]) {
-		//printf("Error could not be added! capacity(%zu) id smaller than count(%zu)\n", set->capacity, set->count);
-        return;
-    }
-
-	set->dense[set->count] = id.id;
-    set->sparse[id.id] = set->count;
-    set->data[set->count] = elipse;
-    set->count++;
-	//printf("  SUCCESS: added at count=%zu\n", set->count - 1);
 }
 
 void remove_id(elipse_sset* set, entity_id id, entity_manager* em)
@@ -123,10 +116,12 @@ void remove_id(elipse_sset* set, entity_id id, entity_manager* em)
     size_t last = --set->count;
 
     set->dense[old_id] = last;
-    // set->data[old_id] = set->data[last];
     set->x[old_id] = set->x[last];
     set->y[old_id] = set->y[last];
     set->h[old_id] = set->h[last];
+
+    // set->data[old_id] = set->data[last];
+	set->points[old_id * points_size] = set->points[last * points_size];
 
     set->sparse[set->dense[old_id]] = old_id;
 
@@ -145,7 +140,32 @@ size_t search(elipse_sset* set, uint32_t id)
     return index;
 }
 
-// speed_sset functions
+// elipse_sset functions AoS approach
+
+elipse_sset_d* elipse_sset_d_init(elipse_sset_d* set, Arena* arena, size_t capacity) {
+	set->dense = PushArray(arena, uint32_t, capacity); 
+	set->sparse = PushArray(arena, uint32_t, capacity); 
+	set->data = PushArray(arena, SDL_Elipse, capacity); 
+    set->capacity = capacity;
+    set->count = 0;
+    return set;
+}
+
+void add_elipse_d(elipse_sset_d* set, SDL_Elipse elipse, entity_id id, entity_manager* em)
+{
+
+    if (set->count > set->capacity || id.generation != em->generations[id.id]) {
+		printf("Error could not be added! capacity(%zu) id smaller than count(%zu)\n", set->capacity, set->count);
+        return;
+    }
+
+	set->dense[set->count] = id.id;
+    set->sparse[id.id] = set->count;
+    set->data[set->count] = elipse;
+    set->count++;
+}
+
+// speed_sset functions SoA approach
 speed_sset* speed_sset_init(speed_sset* set, Arena* arena, size_t capacity)
 {
     set->dense = PushArray(arena, uint32_t, capacity);
@@ -162,7 +182,7 @@ speed_sset* speed_sset_init(speed_sset* set, Arena* arena, size_t capacity)
 void add_speed(speed_sset* set, float x_speed, float y_speed, entity_id id, entity_manager* em)
 {
     if (set->count >= set->capacity || id.generation != em->generations[id.id]) {
-        // printf("Error could not be added! capacity(%zu) id smaller than count(%zu)\n", set->capacity, set->count);
+        printf("Error could not be added! capacity(%zu) id smaller than count(%zu)\n", set->capacity, set->count);
         return;
     }
 
@@ -174,6 +194,8 @@ void add_speed(speed_sset* set, float x_speed, float y_speed, entity_id id, enti
     set->count++;
 }
 
+
+// speed_sset functions AoS approach
 
 speed_sset_d* speed_sset_d_init(speed_sset_d* set, Arena* arena, size_t capacity)
 {
@@ -189,7 +211,7 @@ speed_sset_d* speed_sset_d_init(speed_sset_d* set, Arena* arena, size_t capacity
 void add_speed_d(speed_sset_d* set, Speed sp, entity_id id, entity_manager* em)
 {
     if (set->count >= set->capacity || id.generation != em->generations[id.id]) {
-		//printf("Error could not be added! capacity(%zu) id smaller than count(%zu)\n", set->capacity, set->count);
+		printf("Error could not be added! capacity(%zu) id smaller than count(%zu)\n", set->capacity, set->count);
         return;
     }
 

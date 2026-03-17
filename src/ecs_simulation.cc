@@ -14,26 +14,8 @@ const static uint32_t WINDOW_WIDTH = 1000;
 const static uint32_t WINDOW_HEIGHT = 800;
 const uint32_t FRAMES_COUNT = 1000;
 
-const uint32_t objects_amount = 100000;
-
-
 const uint32_t points_size = (10 * 8 * 35 / 49 + (8 - 1)) & -8;
 SDL_Point points[points_size]; 
-
-/////////////////////////////////////////////////////////////////////////////////////////////
-/*
- * ECS implementation
- *
- *
- * Sparse set features:
- * add
- * delete (Keeping track of free ids, generations, alive)
- * search
- * clear
- *
- *
- * Sparse set ids features:
- */
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // main function
@@ -88,20 +70,22 @@ void DrawCircle(SDL_Renderer* renderer, SDL_Elipse *elipse)
 	SDL_RenderDrawPoints(renderer, points, points_size);
 }
 
-bool draw_objects(entity_id* object_ids, size_t capacity, elipse_sset_d* eset, speed_sset_d* sset, SDL_Window* sdl_window, SDL_Renderer* renderer)
+bool draw_objects(entity_id* object_ids, size_t capacity, elipse_sset_d* eset, speed_sset_d* sset, SDL_Window* sdl_window, SDL_Renderer* renderer, int benchmark_mode)
 {
     SDL_Event event;
-    while (SDL_PollEvent(&event)) {
+    while (!benchmark_mode && SDL_PollEvent(&event)) {
         switch (event.type) {
 			case SDL_QUIT:
 				return false;
         }
     }
+	
+	if(!benchmark_mode) {
+		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+		SDL_RenderClear(renderer);
 
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_RenderClear(renderer);
-
-    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+	}
 
 	const auto start = std::chrono::high_resolution_clock::now();
 	
@@ -131,40 +115,47 @@ bool draw_objects(entity_id* object_ids, size_t capacity, elipse_sset_d* eset, s
 		eset->data[i].x += sset->data[i].x_speed;
 	}
 
-	for(int i = 0; i < eset->count; ++i) {
+	for(int i = 0; !benchmark_mode && i < eset->count; ++i) {
 		DrawCircle(renderer, &eset->data[i]);
 	}
 	const auto end = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 	//cout << "The generation of each frame lasted = " << duration.count() << " microseconds" << endl;
 
-    SDL_RenderPresent(renderer);
+	if(!benchmark_mode)
+		SDL_RenderPresent(renderer);
     return true;
 }
 
-int run_ecs_simulation()
+int run_ecs_simulation(int amount_of_objects, int benchmark_mode)
 {
-    SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
-    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
+	static uint32_t objects_amount = amount_of_objects;
+	SDL_Window* sdl_window = NULL;
+	SDL_Renderer* renderer = NULL;
+	
+	if(!benchmark_mode) {
+		SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
+		SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        fprintf(stderr, "SDL could not be initialized!\nSDL_Error:", SDL_GetError());
-        return 1;
-    }
+		if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+			fprintf(stderr, "SDL could not be initialized!\nSDL_Error:", SDL_GetError());
+			return 1;
+		}
 
-    SDL_Window* sdl_window = SDL_CreateWindow("Test Window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
-    if (sdl_window == NULL) {
-        fprintf(stderr, "SDL Window could not be created!\nSDL_Error:", SDL_GetError());
-        SDL_Quit();
-        return 1;
-    }
+		sdl_window = SDL_CreateWindow("Test Window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
+		if (sdl_window == NULL) {
+			fprintf(stderr, "SDL Window could not be created!\nSDL_Error:", SDL_GetError());
+			SDL_Quit();
+			return 1;
+		}
 
-    SDL_Renderer* renderer = SDL_CreateRenderer(sdl_window, -1, 0);
-    if (!renderer) {
-        fprintf(stderr, "SDL Renderer could not be created!\nSDL_Error:", SDL_GetError());
-        SDL_Quit();
-        return 1;
-    }
+		renderer = SDL_CreateRenderer(sdl_window, -1, 0);
+		if (!renderer) {
+			fprintf(stderr, "SDL Renderer could not be created!\nSDL_Error:", SDL_GetError());
+			SDL_Quit();
+			return 1;
+		}
+	}
 
 	Arena* level_arena = ArenaAlloc(5000 * 1024); //50 kb
 	elipse_sset_d* eset = PushStruct(level_arena, elipse_sset_d);
@@ -197,7 +188,7 @@ int run_ecs_simulation()
 	
 	const auto start = std::chrono::high_resolution_clock::now();
 	int i = 0;
-    while (draw_objects(object_ids, objects_amount, eset, sset, sdl_window, renderer) && i < FRAMES_COUNT) {
+    while (draw_objects(object_ids, objects_amount, eset, sset, sdl_window, renderer, benchmark_mode) && i < FRAMES_COUNT) {
         //SDL_Delay(16);
 		i++;
     }
@@ -205,9 +196,11 @@ int run_ecs_simulation()
 	const auto end = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 	cout << "The generation of " << FRAMES_COUNT << " frames, for " << objects_amount << " objects, lasted = " << duration.count() / 10e5 << " seconds" << endl;
-
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(sdl_window);
-    SDL_Quit();
+	
+	if(!benchmark_mode) {
+		SDL_DestroyRenderer(renderer);
+		SDL_DestroyWindow(sdl_window);
+		SDL_Quit();
+	}
     return 0;
 }

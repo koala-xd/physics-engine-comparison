@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
-project(physics-engine-simulation)
+
+project(
+	physics-engine-simulation
+	DESCRIPTION "Optimizing physics simulation"
+)
 
 add_executable(simulation)
 
@@ -16,7 +20,6 @@ target_compile_options(simulation PRIVATE -O3 -Wall -Wextra)
 
 # Linker flags
 target_link_options(simulation PRIVATE -pthread)
-
 
 # including SDL2
 target_include_directories(simulation PRIVATE ${SDL2_INCLUDE_DIRS})

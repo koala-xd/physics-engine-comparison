@@ -12,8 +12,6 @@ using namespace std;
 const static uint32_t WINDOW_HEIGHT = 800, WINDOW_WIDTH = 1000;
 const uint32_t FRAMES_COUNT = 1000;
 
-const static size_t objects_amount = 100000;
-
 
 // custom elipse/circle draw function 
 SDL_Point *compute_circle(int32_t centreX, int32_t centreY, int32_t radius, size_t points_size) {
@@ -125,21 +123,23 @@ void DrawCircleOOP(SDL_Renderer* renderer, Elipse elipse)
 }
 
 
-bool draw_objects(SDL_Window* sdl_window, SDL_Renderer* renderer, size_t capacity, vector<Elipse>& elipses)
+bool draw_objects(SDL_Window* sdl_window, SDL_Renderer* renderer, size_t capacity, vector<Elipse>& elipses, int benchmark_mode)
 {
     SDL_Event event;
-    while (SDL_PollEvent(&event)) {
+    while (!benchmark_mode && SDL_PollEvent(&event)) {
         switch (event.type) {
         case SDL_QUIT:
             return false;
         }
     }
 
-	// redrawing the whole screen
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_RenderClear(renderer);
+	if(!benchmark_mode) {
+		// redrawing the whole screen
+		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+		SDL_RenderClear(renderer);
 
-    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+	}
 
 	const auto start = std::chrono::high_resolution_clock::now();
 
@@ -164,13 +164,16 @@ bool draw_objects(SDL_Window* sdl_window, SDL_Renderer* renderer, size_t capacit
         elipse.x += cur_x_speed;
 
 		elipses[i] = elipse;
-		DrawCircleOOP(renderer, elipses[i]);
+		if(!benchmark_mode) {
+			DrawCircleOOP(renderer, elipses[i]);
+		}
     }
 	//const auto end = std::chrono::high_resolution_clock::now();
 	//auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 	//cout << "The generation of each frame lasted = " << duration.count() << " microseconds" << endl;
 
-    SDL_RenderPresent(renderer);
+	if(!benchmark_mode)
+		SDL_RenderPresent(renderer);
     return true;
 }
 
@@ -179,29 +182,34 @@ bool draw_objects(SDL_Window* sdl_window, SDL_Renderer* renderer, size_t capacit
 //
 //
 
-int run_oop_simulation(void)
+int run_oop_simulation(int amount_of_objects, int benchmark_mode)
 {
-    SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
-    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
+	static uint32_t objects_amount = amount_of_objects;
+	static SDL_Window* sdl_window = NULL;
+	SDL_Renderer* renderer = NULL;
+	if(!benchmark_mode) {
+		SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
+		SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        fprintf(stderr, "SDL could not be initialized!\nSDL_Error:", SDL_GetError());
-        return 1;
-    }
+		if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+			fprintf(stderr, "SDL could not be initialized!\nSDL_Error:", SDL_GetError());
+			return 1;
+		}
 
-    static SDL_Window* sdl_window = SDL_CreateWindow("Test Window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
-    if (sdl_window == NULL) {
-        fprintf(stderr, "SDL Window could not be created!\nSDL_Error:", SDL_GetError());
-        SDL_Quit();
-        return 1;
-    }
+		sdl_window = SDL_CreateWindow("Test Window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
+		if (sdl_window == NULL) {
+			fprintf(stderr, "SDL Window could not be created!\nSDL_Error:", SDL_GetError());
+			SDL_Quit();
+			return 1;
+		}
 
-    SDL_Renderer* renderer = SDL_CreateRenderer(sdl_window, -1, 0);
-    if (!renderer) {
-        fprintf(stderr, "SDL Renderer could not be created!\nSDL_Error:", SDL_GetError());
-        SDL_Quit();
-        return 1;
-    }
+		renderer = SDL_CreateRenderer(sdl_window, -1, 0);
+		if (!renderer) {
+			fprintf(stderr, "SDL Renderer could not be created!\nSDL_Error:", SDL_GetError());
+			SDL_Quit();
+			return 1;
+		}
+	}
 
 	vector<Elipse> elipses(objects_amount);
 
@@ -215,16 +223,17 @@ int run_oop_simulation(void)
 
 	const auto start = std::chrono::high_resolution_clock::now();
 	int i = 0;
-    while (draw_objects(sdl_window, renderer, 10, elipses) && i < FRAMES_COUNT) {
-        //SDL_Delay(16);
+    while (draw_objects(sdl_window, renderer, 10, elipses, benchmark_mode) && i < FRAMES_COUNT) {
 		i++;
     }
 	const auto end = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 	cout << "The generation of " << FRAMES_COUNT << " frames lasted = " << duration.count() / 10e5 << " seconds" << endl;
-
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(sdl_window);
-    SDL_Quit();
+	
+	if(!benchmark_mode) {
+		SDL_DestroyRenderer(renderer);
+		SDL_DestroyWindow(sdl_window);
+		SDL_Quit();
+	}
     return 0;
 }

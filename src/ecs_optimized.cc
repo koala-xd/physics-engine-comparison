@@ -30,10 +30,8 @@ using namespace std;
 
 const static uint32_t WINDOW_WIDTH = 1000;
 const static uint32_t WINDOW_HEIGHT = 800;
-const uint32_t FRAMES_COUNT = 1000;
-const uint32_t CIRCLE_WIDTH = 10;
-
-const uint32_t objects_amount = 1e5; // 100000
+const int FRAMES_COUNT = 1000;
+const int CIRCLE_WIDTH = 10;
 
 const uint32_t points_size = (10 * 8 * 35 / 49 + (8 - 1)) & -8;
 static SDL_Point* points_template = NULL;
@@ -204,13 +202,6 @@ void* physics_computations(void* argv)
 				// storing
 				int32x4x2_t vXYnew = {vXnew, vYnew};
 				vst2q_s32((int32_t *) &eset->points[id], vXYnew);
-
-				//vst1q_s32(xNew, vXnew);
-				//vst1q_s32(yNew, vYnew);
-				//for(int laneT = 0; laneT < 4; ++laneT) {
-				//	id += laneT;
-				//	eset->points[id] = {xNew[laneT], yNew[laneT]};
-				//}
 			}
 		}
     }
@@ -236,16 +227,14 @@ void* physics_computations(void* argv)
 void task_manager(Range* ranges, const uint32_t& count, void* (*function)(void*))
 {
     for (int i = 0; i < count; ++i) {
-        // task_t task = {function, (&ranges[i])};
-        // shared_queue_p[i] = task;
         shared_queue.push({ function, (&ranges[i]) });
     }
 }
 
-bool draw_objects(entity_id* object_ids, const size_t& capacity, Range* ranges, pthread_t* threads, const uint32_t& nprocs, SDL_Window* sdl_window, SDL_Renderer* renderer)
+bool draw_objects(entity_id* object_ids, const size_t& capacity, Range* ranges, pthread_t* threads, const uint32_t& nprocs, SDL_Window* sdl_window, SDL_Renderer* renderer, int benchmark_mode)
 {
     SDL_Event event;
-    while (SDL_PollEvent(&event)) {
+    while (!benchmark_mode && SDL_PollEvent(&event)) {
         switch (event.type) {
         case SDL_QUIT:
             return false;
@@ -299,8 +288,6 @@ void* thread_work(void* argc)
             pthread_cond_wait(&task_available, &queue_lock);
         }
         // getting new task
-        // task_t task = shared_queue_p[task_counter];
-        // task_counter--;
         task_t task = shared_queue.front();
         shared_queue.pop();
         pthread_mutex_unlock(&queue_lock);
@@ -309,29 +296,35 @@ void* thread_work(void* argc)
     }
 }
 
-int run_ecs_optimized(void)
+int run_ecs_optimized(int amount_of_objects, int benchmark_mode)
 {
-    SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
-    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
+	static uint32_t objects_amount = amount_of_objects;
+    SDL_Window* sdl_window = NULL;
+	SDL_Renderer* renderer = NULL;
+	
+	if(!benchmark_mode) {
+		SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
+		SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        fprintf(stderr, "SDL could not be initialized!\nSDL_Error: %s", SDL_GetError());
-        return 1;
-    }
+		if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+			fprintf(stderr, "SDL could not be initialized!\nSDL_Error:", SDL_GetError());
+			return 1;
+		}
 
-    SDL_Window* sdl_window = SDL_CreateWindow("Test Window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
-    if (sdl_window == NULL) {
-        fprintf(stderr, "SDL Window could not be created!\nSDL_Error: %s", SDL_GetError());
-        SDL_Quit();
-        return 1;
-    }
+		sdl_window = SDL_CreateWindow("Test Window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
+		if (sdl_window == NULL) {
+			fprintf(stderr, "SDL Window could not be created!\nSDL_Error:", SDL_GetError());
+			SDL_Quit();
+			return 1;
+		}
 
-    SDL_Renderer* renderer = SDL_CreateRenderer(sdl_window, -1, 0);
-    if (!renderer) {
-        fprintf(stderr, "SDL Renderer could not be created!\nSDL_Error: %s", SDL_GetError());
-        SDL_Quit();
-        return 1;
-    }
+		renderer = SDL_CreateRenderer(sdl_window, -1, 0);
+		if (!renderer) {
+			fprintf(stderr, "SDL Renderer could not be created!\nSDL_Error:", SDL_GetError());
+			SDL_Quit();
+			return 1;
+		}
+	}
 
     // data strcutres allocations
     eset = elipse_sset_init(eset, level_arena, objects_amount);
@@ -343,7 +336,7 @@ int run_ecs_optimized(void)
     compute_circle(x0, y0, CIRCLE_WIDTH, points_template, 0, points_size);
 
     entity_id object_ids[1];
-    const static uint32_t nprocs = sysconf(_SC_NPROCESSORS_ONLN) > 2 ? std::min((uint32_t)5, (uint32_t)sysconf(_SC_NPROCESSORS_ONLN)) : 1;
+    const static int nprocs = sysconf(_SC_NPROCESSORS_ONLN) > 2 ? std::min((uint32_t)5, (uint32_t)sysconf(_SC_NPROCESSORS_ONLN)) : 1;
     std::cout << "Thread count: " << nprocs << endl;
 
     // init threads
@@ -369,19 +362,16 @@ int run_ecs_optimized(void)
 
     const auto start = std::chrono::high_resolution_clock::now();
     int i = 0;
-    while (draw_objects(object_ids, objects_amount, ranges, threads, nprocs, sdl_window, renderer) && i < FRAMES_COUNT) {
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        SDL_RenderClear(renderer);
+    while (draw_objects(object_ids, objects_amount, ranges, threads, nprocs, sdl_window, renderer, benchmark_mode) && i < FRAMES_COUNT) {
+		if(!benchmark_mode) {
+			SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+			SDL_RenderClear(renderer);
+			SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
 
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-		//for(int circle_id = 0; circle_id < eset->count; ++circle_id) {
-		//	printf("pt(%d): %d,%d\n", circle_id, eset->points[circle_id * points_size + 0].x, eset->points[circle_id * points_size + 0].y);
-		//	printf("pt1(%d): %d,%d\n", circle_id, eset->points[circle_id * points_size + 1].x, eset->points[circle_id * points_size + 1].y);
-		//}
-		SDL_RenderDrawPoints(renderer, eset->points, objects_amount * points_size);
+			SDL_RenderDrawPoints(renderer, eset->points, objects_amount * points_size);
 
-        SDL_RenderPresent(renderer);
-        // SDL_Delay(16);
+			SDL_RenderPresent(renderer);
+		}
         i++;
     }
     auto end = std::chrono::high_resolution_clock::now();
@@ -393,8 +383,10 @@ int run_ecs_optimized(void)
     duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 	printf("The generation of %i frames, for %i objects, lasted = %.4f seconds, amount of threads = %i\n", FRAMES_COUNT, objects_amount, duration.count() / 1e6, nprocs);
 
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(sdl_window);
-    SDL_Quit();
+	if(!benchmark_mode) {
+		SDL_DestroyRenderer(renderer);
+		SDL_DestroyWindow(sdl_window);
+		SDL_Quit();
+	}
     return 0;
 }
