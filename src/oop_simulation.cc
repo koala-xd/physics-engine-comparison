@@ -1,66 +1,17 @@
-/*
- * The idea of this program is: to compare the efficiency of different code architectures (OOP and ESC).
- * Problem: the program draws 100, 1k, 10k, 100k, 1m of objects and simulates how the ball (circle) falls and then bounces back.
- */
-
 #include <iostream>
 #include <SDL2/SDL.h>
 #include <SDL.h>
 
 using namespace std;
 
+/////////////////////////////////////////////////////////////////////////////////////////////
+// const 
+
 const static uint32_t WINDOW_HEIGHT = 800, WINDOW_WIDTH = 1000;
-const uint32_t FRAMES_COUNT = 1000;
-
-
-// custom elipse/circle draw function 
-SDL_Point *compute_circle(int32_t centreX, int32_t centreY, int32_t radius, size_t points_size) {
-	SDL_Point points[points_size];
-
-    int32_t x = (radius - 1);
-    int32_t y = 0;
-    int32_t tx = 1;
-    int32_t ty = 1;
-    int32_t error = (tx - (radius << 1));
-
-	int counter = 0;
-    while (x >= y) {
-        // Each of the following renders an octant of the circle
-		
-		points[counter] = {centreX + x, centreY - y};	
-		points[counter + 1] = {centreX + x, centreY + y};	
-
-		points[counter + 2] = {centreX - x, centreY - y};	
-		points[counter + 3] = {centreX - x, centreY + y};	
-
-		points[counter + 4] = {centreX + y, centreY - x};	
-		points[counter + 5] = {centreX + y, centreY + x};	
-
-		points[counter + 6] = {centreX - y, centreY - x};	
-		points[counter + 7] = {centreX - y, centreY + x};	
-
-        if (error <= 0) {
-            ++y;
-            error += ty;
-            ty += 2;
-        }
-
-        if (error > 0) {
-            --x;
-            tx += 2;
-            error += (tx - (radius << 1));
-        }
-		counter += 8;
-    }
-	return points;
-}
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////
-/*
- * OOP implementation
- */
-
+// Entities
 
 class Speed {
 public:
@@ -112,7 +63,53 @@ public:
     {
 		return;
     }
+
+	virtual ~Elipse() = default;
 };
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Functions
+
+SDL_Point *compute_circle(int32_t centreX, int32_t centreY, int32_t radius, size_t points_size) {
+	SDL_Point points[points_size];
+
+    int32_t x = (radius - 1);
+    int32_t y = 0;
+    int32_t tx = 1;
+    int32_t ty = 1;
+    int32_t error = (tx - (radius << 1));
+
+	int counter = 0;
+    while (x >= y) {
+        // Each of the following renders an octant of the circle
+		
+		points[counter] = {centreX + x, centreY - y};	
+		points[counter + 1] = {centreX + x, centreY + y};	
+
+		points[counter + 2] = {centreX - x, centreY - y};	
+		points[counter + 3] = {centreX - x, centreY + y};	
+
+		points[counter + 4] = {centreX + y, centreY - x};	
+		points[counter + 5] = {centreX + y, centreY + x};	
+
+		points[counter + 6] = {centreX - y, centreY - x};	
+		points[counter + 7] = {centreX - y, centreY + x};	
+
+        if (error <= 0) {
+            ++y;
+            error += ty;
+            ty += 2;
+        }
+
+        if (error > 0) {
+            --x;
+            tx += 2;
+            error += (tx - (radius << 1));
+        }
+		counter += 8;
+    }
+	return points;
+}
 
 void DrawCircleOOP(SDL_Renderer* renderer, Elipse elipse)
 {
@@ -122,8 +119,7 @@ void DrawCircleOOP(SDL_Renderer* renderer, Elipse elipse)
 	SDL_RenderDrawPoints(renderer, points, points_size);
 }
 
-
-bool draw_objects(SDL_Window* sdl_window, SDL_Renderer* renderer, size_t capacity, vector<Elipse>& elipses, int benchmark_mode)
+bool draw_objects(SDL_Renderer* renderer, vector<Elipse>& elipses, int benchmark_mode)
 {
     SDL_Event event;
     while (!benchmark_mode && SDL_PollEvent(&event)) {
@@ -141,9 +137,7 @@ bool draw_objects(SDL_Window* sdl_window, SDL_Renderer* renderer, size_t capacit
 		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
 	}
 
-	const auto start = std::chrono::high_resolution_clock::now();
-
-    for (int i = 0; i < elipses.size(); ++i) {
+    for (size_t i = 0; i < elipses.size(); ++i) {
 		Elipse elipse = elipses[i];
         float_t cur_y_speed = elipse.speed.y_speed * 0.99;
         float_t cur_x_speed = elipse.speed.x_speed * 0.99;
@@ -168,10 +162,6 @@ bool draw_objects(SDL_Window* sdl_window, SDL_Renderer* renderer, size_t capacit
 			DrawCircleOOP(renderer, elipses[i]);
 		}
     }
-	//const auto end = std::chrono::high_resolution_clock::now();
-	//auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	//cout << "The generation of each frame lasted = " << duration.count() << " microseconds" << endl;
-
 	if(!benchmark_mode)
 		SDL_RenderPresent(renderer);
     return true;
@@ -179,12 +169,11 @@ bool draw_objects(SDL_Window* sdl_window, SDL_Renderer* renderer, size_t capacit
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // main function
-//
-//
 
-int run_oop_simulation(int amount_of_objects, int benchmark_mode)
+int run_oop_simulation(int amount_of_objects, int benchmark_mode, int frames_count)
 {
-	static uint32_t objects_amount = amount_of_objects;
+	static int objects_amount = amount_of_objects;
+	static int FRAMES_COUNT = frames_count;
 	static SDL_Window* sdl_window = NULL;
 	SDL_Renderer* renderer = NULL;
 	if(!benchmark_mode) {
@@ -218,12 +207,11 @@ int run_oop_simulation(int amount_of_objects, int benchmark_mode)
         Speed sp = { (float) (i + 1), (float) 9.81 / 60 * 5 * (i + 1)};
 		elipses[i] = Elipse(100, i * 50 + y, 10, 10, sp);
         y += 10;
-        //add(sset, sp);
     }
 
 	const auto start = std::chrono::high_resolution_clock::now();
 	int i = 0;
-    while (draw_objects(sdl_window, renderer, 10, elipses, benchmark_mode) && i < FRAMES_COUNT) {
+    while (draw_objects(renderer, elipses, benchmark_mode) && i < FRAMES_COUNT) {
 		i++;
     }
 	const auto end = std::chrono::high_resolution_clock::now();

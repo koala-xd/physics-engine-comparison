@@ -1,8 +1,3 @@
-/* NOTE:
- * The idea of this program is: to compare the efficiency of different code architectures (OOP and ESC).
- * Problem: the program draws 100, 1k, 10k, 100k, 1m of objects and simulates how the ball (circle) falls and then bounces back.
- */
-
 #include <iostream>
 #include <SDL2/SDL.h>
 #include "../include/arena.h"
@@ -10,19 +5,17 @@
 
 using namespace std;
 
+/////////////////////////////////////////////////////////////////////////////////////////////
+// const 
+
 const static uint32_t WINDOW_WIDTH = 1000;
 const static uint32_t WINDOW_HEIGHT = 800;
-const uint32_t FRAMES_COUNT = 1000;
 
 const uint32_t points_size = (10 * 8 * 35 / 49 + (8 - 1)) & -8;
 SDL_Point points[points_size]; 
 
 /////////////////////////////////////////////////////////////////////////////////////////////
-// main function
-//
-//
-
-// custom elipse/circle draw function (ECS)
+// Functions
 
 void compute_circle(SDL_Point* points, int32_t centreX, int32_t centreY, int32_t radius, size_t points_size) {
 
@@ -65,7 +58,6 @@ void compute_circle(SDL_Point* points, int32_t centreX, int32_t centreY, int32_t
 
 void DrawCircle(SDL_Renderer* renderer, SDL_Elipse *elipse)
 {
-	//vector<Point> points = compute_circle_oop(elipse.x, elipse.y, elipse.h, points_size);
 	compute_circle(points, elipse->x, elipse->y, elipse->h, points_size);
 	SDL_RenderDrawPoints(renderer, points, points_size);
 }
@@ -86,8 +78,6 @@ bool draw_objects(entity_id* object_ids, size_t capacity, elipse_sset_d* eset, s
 
 		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
 	}
-
-	const auto start = std::chrono::high_resolution_clock::now();
 	
 	// Y-axis collision
     for (int i = 0; i < eset->count; ++i) {
@@ -118,18 +108,20 @@ bool draw_objects(entity_id* object_ids, size_t capacity, elipse_sset_d* eset, s
 	for(int i = 0; !benchmark_mode && i < eset->count; ++i) {
 		DrawCircle(renderer, &eset->data[i]);
 	}
-	const auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	//cout << "The generation of each frame lasted = " << duration.count() << " microseconds" << endl;
 
 	if(!benchmark_mode)
 		SDL_RenderPresent(renderer);
     return true;
 }
 
-int run_ecs_simulation(int amount_of_objects, int benchmark_mode)
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// main function
+
+int run_ecs_simulation(int amount_of_objects, int benchmark_mode, int frames_count)
 {
 	static uint32_t objects_amount = amount_of_objects;
+	static int FRAMES_COUNT = frames_count;
 	SDL_Window* sdl_window = NULL;
 	SDL_Renderer* renderer = NULL;
 	
@@ -167,12 +159,7 @@ int run_ecs_simulation(int amount_of_objects, int benchmark_mode)
 	entity_manager* em = PushStruct(level_arena, entity_manager);
 	em = entity_manager_init(em, level_arena, objects_amount);
 
-	//entity_manager* em = entity_manager_init(objects_amount);
-    //elipse_sset* eset = elipse_sset_init(objects_amount);
-    //speed_sset* sset = speed_sset_init(objects_amount);
-
 	entity_id object_ids[10];
-
 
     for (int i = 0; i < objects_amount; ++i) {
 		entity_id entity_id = create_id(em);
@@ -189,7 +176,6 @@ int run_ecs_simulation(int amount_of_objects, int benchmark_mode)
 	const auto start = std::chrono::high_resolution_clock::now();
 	int i = 0;
     while (draw_objects(object_ids, objects_amount, eset, sset, sdl_window, renderer, benchmark_mode) && i < FRAMES_COUNT) {
-        //SDL_Delay(16);
 		i++;
     }
 	ArenaRelease((&level_arena));

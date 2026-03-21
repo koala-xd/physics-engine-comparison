@@ -5,6 +5,8 @@
 #include "../include/ecs_simulation.h"
 #include "../include/oop_simulation.h"
 
+const static int FRAMES_COUNT = 500;
+
 void print_help() {
 	std::cout << "Usage: simulation [MODE] [OBJECTS AMOUNT] [BENCHMARK MODE]\n\n";
     std::cout << "Modes:\n";
@@ -19,7 +21,7 @@ void print_help() {
 void print_comment(std::string mode, int amount_of_objects) {
 	std::cout << "Mode: " << mode << "\n";
 	std::cout << "Objects: " << amount_of_objects << "\n";;
-	std::cout << "Frames: " << 1000 << "\n";
+	std::cout << "Frames: " << FRAMES_COUNT << "\n";
 }
 
 
@@ -51,17 +53,17 @@ int main(int argc, char** argv)
     else if(arg == "oop")
     {
 		print_comment(arg, amount_of_objects);
-        run_oop_simulation(amount_of_objects, benchmark_mode);
+        run_oop_simulation(amount_of_objects, benchmark_mode, FRAMES_COUNT);
     }
     else if(arg == "ecs")
     {
 		print_comment(arg, amount_of_objects);
-        run_ecs_simulation(amount_of_objects, benchmark_mode);
+        run_ecs_simulation(amount_of_objects, benchmark_mode, FRAMES_COUNT);
     }
     else if(arg == "ecs_optimized")
     {
 		print_comment(arg, amount_of_objects);
-        run_ecs_optimized(amount_of_objects, benchmark_mode);
+        run_ecs_optimized(amount_of_objects, benchmark_mode, FRAMES_COUNT);
     }
     else
     {
