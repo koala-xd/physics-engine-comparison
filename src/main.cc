@@ -5,7 +5,7 @@
 #include "../include/ecs_simulation.h"
 #include "../include/oop_simulation.h"
 
-const static int FRAMES_COUNT = 500;
+const static int FRAMES_COUNT = 1500;
 
 void print_help() {
 	std::cout << "Usage: simulation [MODE] [OBJECTS AMOUNT] [BENCHMARK MODE]\n\n";

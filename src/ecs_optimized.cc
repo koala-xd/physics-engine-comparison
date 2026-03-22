@@ -21,7 +21,7 @@ const int CIRCLE_WIDTH = 10;
 const uint32_t points_size = (10 * 8 * 35 / 49 + (8 - 1)) & -8;
 static SDL_Point* points_template = NULL;
 
-static Arena* level_arena = ArenaAlignedAlloc(80 * 1024 * 1024); // 80 mb
+static Arena* level_arena = NULL; 
 
 pthread_mutex_t mtx_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t task_available = PTHREAD_COND_INITIALIZER, task_done = PTHREAD_COND_INITIALIZER;
@@ -32,6 +32,7 @@ static int stop_threads = 0;
 uint32_t thread_remaining = 0;
 
 uint32_t task_counter = 0;
+const static int THREAD_COUNT = 4; // optimal amount of threads (if possible)
 static int nprocs = 1;
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,9 +50,9 @@ typedef struct {
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Data structures 
 
-static elipse_sset* eset = PushStruct(level_arena, elipse_sset);
-static speed_sset* sset = PushStruct(level_arena, speed_sset);
-static entity_manager* em = PushStruct(level_arena, entity_manager);
+static elipse_sset* eset = NULL;
+static speed_sset* sset = NULL;
+static entity_manager* em = NULL;
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // functions 
@@ -279,6 +280,11 @@ int run_ecs_optimized(int amount_of_objects, int benchmark_mode, int frames_coun
 {
     static uint32_t objects_amount = amount_of_objects;
     static int FRAMES_COUNT = frames_count;
+	level_arena = ArenaAlignedAlloc((sizeof(elipse_sset) + sizeof(speed_sset) + sizeof(entity_manager) + (sizeof(SDL_Point) * points_size)) * (objects_amount + 1)); // 80 mb
+
+	eset = PushStruct(level_arena, elipse_sset);
+	sset = PushStruct(level_arena, speed_sset);
+	em = PushStruct(level_arena, entity_manager);
 
     SDL_Window* sdl_window = NULL;
     SDL_Renderer* renderer = NULL;
@@ -317,7 +323,9 @@ int run_ecs_optimized(int amount_of_objects, int benchmark_mode, int frames_coun
     compute_circle(x0, y0, CIRCLE_WIDTH, points_template, 0, points_size);
 
     entity_id object_ids[1];
-    nprocs = sysconf(_SC_NPROCESSORS_ONLN) > 2 ? std::min((int)4, (int)sysconf(_SC_NPROCESSORS_ONLN)) : nprocs;
+	if(objects_amount >= 100) {
+		nprocs = sysconf(_SC_NPROCESSORS_ONLN) > 2 ? std::min((int)THREAD_COUNT, (int)sysconf(_SC_NPROCESSORS_ONLN)) : nprocs;
+	}
     std::cout << "Thread count: " << nprocs << endl;
 
 	for(uint32_t i = 0; i < objects_amount; i++) {
@@ -339,7 +347,6 @@ int run_ecs_optimized(int amount_of_objects, int benchmark_mode, int frames_coun
     Range ranges[nprocs];
     for (int i = 0; i < nprocs; ++i) {
         ranges[i] = { i * (id_group_size), (i + 1) * id_group_size };
-        //tasks[i] = { &create_circles, ranges[i] };
 		tasks[i].func = &physics_computations; 
 		tasks[i].arg = &ranges[i];
         pthread_create(&threads[i], NULL, thread_work, &tasks[i]);

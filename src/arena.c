@@ -36,7 +36,7 @@ void ArenaRelease(Arena** arena)
 
 void* ArenaPush(Arena* arena, uint64_t size)
 {
-    if (arena->size < size || arena->size - arena->offset < size) {
+    if (arena == NULL || arena->size < size || arena->size - arena->offset < size) {
         fprintf(stderr, "Impossible to allocate memory of size %llu\n", size);
         return NULL;
     }

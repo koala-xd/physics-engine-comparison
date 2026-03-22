@@ -149,7 +149,7 @@ int run_ecs_simulation(int amount_of_objects, int benchmark_mode, int frames_cou
 		}
 	}
 
-	Arena* level_arena = ArenaAlloc(5000 * 1024); //50 kb
+	Arena* level_arena = ArenaAlloc((sizeof(elipse_sset_d) + sizeof(speed_sset_d) + sizeof(entity_manager)) * (objects_amount + 1)); 
 	elipse_sset_d* eset = PushStruct(level_arena, elipse_sset_d);
 	eset = elipse_sset_d_init(eset, level_arena, objects_amount);
 
@@ -163,7 +163,6 @@ int run_ecs_simulation(int amount_of_objects, int benchmark_mode, int frames_cou
 
     for (int i = 0; i < objects_amount; ++i) {
 		entity_id entity_id = create_id(em);
-		//object_ids[i] = entity_id;
 		float x = (rand() % WINDOW_WIDTH);
 		float y = (rand() % WINDOW_HEIGHT);
         SDL_Elipse elipse = create_elipse(x, y, 10, 10);
@@ -178,11 +177,11 @@ int run_ecs_simulation(int amount_of_objects, int benchmark_mode, int frames_cou
     while (draw_objects(object_ids, objects_amount, eset, sset, sdl_window, renderer, benchmark_mode) && i < FRAMES_COUNT) {
 		i++;
     }
-	ArenaRelease((&level_arena));
 	const auto end = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 	cout << "The generation of " << FRAMES_COUNT << " frames, for " << objects_amount << " objects, lasted = " << duration.count() / 10e5 << " seconds" << endl;
 	
+	ArenaRelease((&level_arena));
 	if(!benchmark_mode) {
 		SDL_DestroyRenderer(renderer);
 		SDL_DestroyWindow(sdl_window);
