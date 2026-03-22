@@ -1,11 +1,11 @@
 # Benchmark environment
 
 ## Test setup:
-Machine: MacBook Pro M3
-CPU: Apple M3
-Memory: 8 Gb
-Compiler: clang
-Flags: -O3
+- Machine: MacBook Pro M3
+- CPU: Apple M3
+- Memory: 8 Gb
+- Compiler: clang
+- Flags: -O3
 
 ## Simulation parameters:
 - gravity
@@ -33,7 +33,13 @@ Each test was repeated 5 times and averaged.
 
 The following figure shows execution time across different configurations:
 
-<img src="results.png" alt="results" width="200">
+<img src="assets/results.png" alt="results" width="600">
+
+### With Rendering
+![With Rendering](assets/bar_rendering.png)
+
+### Without Rendering
+![Without Rendering](assets/bar_no_rendering.png)
 
 ## Observations:
 - Execution time scales approximately linearly with frame count.

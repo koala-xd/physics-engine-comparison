@@ -185,7 +185,7 @@ int run_oop_simulation(int amount_of_objects, int benchmark_mode, int frames_cou
 			return 1;
 		}
 
-		sdl_window = SDL_CreateWindow("Test Window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
+		sdl_window = SDL_CreateWindow("Simulation", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
 		if (sdl_window == NULL) {
 			fprintf(stderr, "SDL Window could not be created!\nSDL_Error:", SDL_GetError());
 			SDL_Quit();
