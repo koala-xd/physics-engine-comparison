@@ -33,7 +33,7 @@ Each test was repeated 5 times and averaged.
 
 The following figure shows execution time across different configurations:
 
-<img src="assets/results.png" alt="results" width="600">
+<img src="assets/results.png" alt="results" width="700">
 
 ### With Rendering
 ![With Rendering](assets/bar_rendering.png)
