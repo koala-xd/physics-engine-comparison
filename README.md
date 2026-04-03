@@ -66,6 +66,9 @@ The simulation models independent circular particles with:
 
 # Results:
 
+All results are averaged over 5 runs.  
+For a more detailed breakdown and additional measurements, see the [benchmarks](./benchmarks) directory.
+
 ## With rendering (100k objects, 1500 Frames):
 - OOP: ~34s   
 - ECS: ~33s
