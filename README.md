@@ -79,8 +79,6 @@ For a more detailed breakdown and additional measurements, see the [benchmarks](
 - ECS: ~0.95s
 - ECS optimized: ~1.60s
 
-All results are averaged over 5 runs. Full benchmark data is available in the /benchmarks directory.
-
 # Findings:
 
 - Rendering dominates total runtime when enabled. The primary performance improvement (~2×) was achieved by batching draw calls (reducing ~100k draw calls per frame to a single call).
